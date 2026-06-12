@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starlink WebScrape</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0a0c10;
+            --surface: #111418;
+            --surface2: #181c22;
+            --border: #1e2329;
+            --border-hi: #2d3340;
+            --accent: #4f8ef7;
+            --accent-dim: rgba(79,142,247,0.12);
+            --accent-glow: rgba(79,142,247,0.25);
+            --green: #34d399;
+            --green-dim: rgba(52,211,153,0.1);
+            --red: #f87171;
+            --amber: #fbbf24;
+            --text-1: #e8ecf0;
+            --text-2: #8b95a4;
+            --text-3: #4a5568;
+            --mono: 'JetBrains Mono', monospace;
+            --sans: 'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text-1);
+            font-family: var(--sans);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* subtle dot grid */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(circle, rgba(255,255,255,0.025) 1px, transparent 1px);
+            background-size: 28px 28px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .app {
+            position: relative;
+            z-index: 1;
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 32px 24px 80px;
+        }
+
+        /* ── TOP NAV ── */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 40px;
+        }
+
+        .wordmark {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .icon-orbit {
+            width: 36px;
+            height: 36px;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .icon-orbit svg { width: 100%; height: 100%; }
+
+        .wordmark-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .wordmark-text .name {
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: var(--text-1);
+        }
+
+        .wordmark-text .tagline {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-3);
+            letter-spacing: 1px;
+            margin-top: 1px;
+        }
+
+        .pill-status {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border-hi);
+            border-radius: 100px;
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: 1px;
+            color: var(--text-2);
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-3);
+            transition: background 0.3s, box-shadow 0.3s;
+            flex-shrink: 0;
+        }
+
+        .dot.live {
+            background: var(--green);
+            box-shadow: 0 0 0 3px var(--green-dim);
+            animation: pulse-dot 2s ease infinite;
+        }
+
+        .dot.error { background: var(--red); }
+
+        @keyframes pulse-dot {
+            0%, 100% { box-shadow: 0 0 0 3px var(--green-dim); }
+            50% { box-shadow: 0 0 0 6px rgba(52,211,153,0.05); }
+        }
+
+        /* ── METRIC CARD ── */
+        .metric-card {
+            background: var(--surface);
+            border: 1px solid var(--border-hi);
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 16px;
+            display: grid;
+            grid-template-columns: 1fr 1px 1fr;
+            gap: 0 40px;
+            align-items: center;
+        }
+
+        .metric-divider {
+            width: 1px;
+            height: 64px;
+            background: var(--border-hi);
+        }
+
+        .metric-eyebrow {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-family: var(--mono);
+            font-size: 56px;
+            font-weight: 300;
+            color: var(--text-1);
+            line-height: 1;
+            letter-spacing: -2px;
+        }
+
+        .metric-value .unit {
+            font-size: 18px;
+            font-weight: 400;
+            color: var(--text-3);
+            letter-spacing: 0;
+            margin-left: 6px;
+        }
+
+        .metric-sub {
+            margin-top: 10px;
+            font-size: 13px;
+            color: var(--text-2);
+            line-height: 1.6;
+        }
+
+        .signal-row {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            margin-top: 14px;
+        }
+
+        .sig {
+            width: 4px;
+            border-radius: 2px;
+            background: var(--border-hi);
+            transition: background 0.4s;
+        }
+
+        .sig:nth-child(1) { height: 6px; }
+        .sig:nth-child(2) { height: 10px; }
+        .sig:nth-child(3) { height: 14px; }
+        .sig:nth-child(4) { height: 18px; }
+        .sig:nth-child(5) { height: 22px; }
+
+        .signal-row.active .sig {
+            background: var(--accent);
+        }
+
+        .meta-section-label {
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-3);
+            margin-bottom: 10px;
+        }
+
+        .meta-desc {
+            font-size: 14px;
+            color: var(--text-2);
+            line-height: 1.75;
+        }
+
+        /* ── MAIN GRID ── */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        /* ── CARD ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border-hi);
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .card-label {
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: var(--text-3);
+            text-transform: uppercase;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* ── BUTTONS ── */
+        .btn-run {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-family: var(--sans);
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+        }
+
+        .btn-run:hover:not(:disabled) {
+            background: #5f9dff;
+            box-shadow: 0 0 24px var(--accent-glow);
+        }
+
+        .btn-run:active:not(:disabled) { transform: scale(0.98); }
+        .btn-run:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .btn-export {
+            width: 100%;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid var(--border-hi);
+            border-radius: 8px;
+            color: var(--text-2);
+            font-family: var(--sans);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            text-decoration: none;
+            transition: border-color 0.15s, color 0.15s, background 0.15s;
+            margin-top: 10px;
+        }
+
+        .btn-export:hover {
+            border-color: var(--green);
+            color: var(--green);
+            background: var(--green-dim);
+        }
+
+        /* progress bar */
+        .progress-bar {
+            height: 2px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .progress-bar.show { opacity: 1; }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #9b8ef7, var(--green));
+            animation: scan 1.8s ease-in-out infinite;
+        }
+
+        @keyframes scan {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+        }
+
+        /* ── LOG ── */
+        .log-box {
+            height: 155px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-hi) transparent;
+        }
+
+        .log-box::-webkit-scrollbar { width: 3px; }
+        .log-box::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+
+        .log-line {
+            display: flex;
+            gap: 10px;
+            padding: 2px 0;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            line-height: 1.8;
+        }
+
+        .log-ts { color: var(--text-3); flex-shrink: 0; }
+        .log-line.ok   .log-msg { color: var(--green); }
+        .log-line.err  .log-msg { color: var(--red); }
+        .log-line.warn .log-msg { color: var(--amber); }
+        .log-line.info .log-msg { color: var(--accent); }
+        .log-line      .log-msg { color: var(--text-2); }
+
+        /* ── TABLE PANEL ── */
+        .table-panel {
+            display: none;
+            background: var(--surface);
+            border: 1px solid var(--border-hi);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .table-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .badge {
+            font-family: var(--mono);
+            font-size: 10px;
+            padding: 3px 10px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(79,142,247,0.25);
+            color: var(--accent);
+            border-radius: 100px;
+            letter-spacing: 1px;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+
+        thead tr { border-bottom: 1px solid var(--border-hi); }
+
+        th {
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: var(--text-3);
+            text-transform: uppercase;
+            font-weight: 400;
+            padding: 6px 10px 10px;
+            text-align: left;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background 0.1s;
+        }
+
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: var(--surface2); }
+
+        td {
+            padding: 11px 10px;
+            font-size: 13px;
+            color: var(--text-2);
+            font-family: var(--sans);
+        }
+
+        td.mono-val {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--text-1);
+            font-weight: 500;
+        }
+
+        .bar-wrap { width: 120px; }
+
+        .bar-rail {
+            height: 3px;
+            background: var(--border-hi);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--green));
+            border-radius: 2px;
+            transition: width 0.6s ease;
+        }
+
+        /* ── FOOTER ── */
+        .footer {
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            color: var(--text-3);
+            text-transform: uppercase;
+            text-align: center;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        @media (max-width: 620px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .metric-card { grid-template-columns: 1fr; gap: 28px 0; }
+            .metric-divider { display: none; }
+            .metric-value { font-size: 40px; }
+            .topbar { gap: 12px; flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+
+    <!-- TOPBAR -->
+    <nav class="topbar">
+        <div class="wordmark">
+            <div class="icon-orbit">
+                <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="18" cy="18" r="17" stroke="#1e2329" stroke-width="1.5"/>
+                    <circle cx="18" cy="18" r="3" fill="#4f8ef7"/>
+                    <ellipse cx="18" cy="18" rx="14" ry="5.5" stroke="#4f8ef7" stroke-width="1" stroke-dasharray="3 2" opacity="0.6"/>
+                    <ellipse cx="18" cy="18" rx="5.5" ry="14" stroke="#34d399" stroke-width="1" stroke-dasharray="3 2" opacity="0.4"/>
+                    <circle cx="30" cy="12" r="1.5" fill="#34d399" opacity="0.8"/>
+                    <circle cx="8" cy="25" r="1.5" fill="#4f8ef7" opacity="0.6"/>
+                </svg>
+            </div>
+            <div class="wordmark-text">
+                <span class="name">Starlink WebScrape</span>
+                <span class="tagline">Usage Monitor · Port 4040</span>
+            </div>
+        </div>
+        <div class="pill-status">
+            <div class="dot" id="statusDot"></div>
+            <span id="statusText">STANDBY</span>
+        </div>
+    </nav>
+
+    <!-- METRIC CARD -->
+    <div class="metric-card">
+        <div>
+            <div class="metric-eyebrow">Total Usage</div>
+            <div class="metric-value" id="liveTotal">—<span class="unit">GB</span></div>
+            <div class="signal-row" id="signalBars">
+                <div class="sig"></div>
+                <div class="sig"></div>
+                <div class="sig"></div>
+                <div class="sig"></div>
+                <div class="sig"></div>
+            </div>
+        </div>
+        <div class="metric-divider"></div>
+        <div>
+            <div class="meta-section-label">Session Summary</div>
+            <div class="meta-desc" id="sessionDesc">No sync performed yet.<br>Initiate extraction below.</div>
+        </div>
+    </div>
+
+    <!-- CONTROLS + LOG -->
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-label">Actions</div>
+            <button class="btn-run" id="scrapeBtn" onclick="startScrape()">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                    <polygon points="2,1 11,6 2,11"/>
+                </svg>
+                Run Sync
+            </button>
+            <a id="dlBtn" href="/api/download-csv" class="btn-export" style="display:none">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6.5 1.5v7M3.5 6l3 3 3-3M1.5 11.5h10"/>
+                </svg>
+                Export CSV
+            </a>
+            <div class="progress-bar" id="progBar">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-label">System Log</div>
+            <div class="log-box" id="log">
+                <div class="log-line">
+                    <span class="log-ts">--:--:--</span>
+                    <span class="log-msg">Terminal ready. Awaiting command.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-panel" id="tablePanel">
+        <div class="table-header">
+            <div class="card-label" style="margin:0;border:none;padding:0">Daily Usage Records</div>
+            <div class="badge" id="rowBadge">0 entries</div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Usage (GB)</th>
+                    <th>Distribution</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="footer" id="ticker">
+        Starlink WebScrape &nbsp;·&nbsp; Last Sync: Never &nbsp;·&nbsp; Port 4040
+    </div>
+</div>
+
+<script>
+    function ts() {
+        const n = new Date();
+        return [n.getHours(), n.getMinutes(), n.getSeconds()]
+            .map(v => String(v).padStart(2,'0')).join(':');
+    }
+
+    function addLog(msg, type = '') {
+        const log = document.getElementById('log');
+        const el = document.createElement('div');
+        el.className = 'log-line' + (type ? ' ' + type : '');
+        el.innerHTML = `<span class="log-ts">${ts()}</span><span class="log-msg">${msg}</span>`;
+        log.appendChild(el);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function setStatus(label, active, isError) {
+        const dot = document.getElementById('statusDot');
+        dot.className = 'dot' + (active ? ' live' : isError ? ' error' : '');
+        document.getElementById('statusText').textContent = label.toUpperCase();
+    }
+
+    async function startScrape() {
+        const btn = document.getElementById('scrapeBtn');
+        const prog = document.getElementById('progBar');
+        document.getElementById('log').innerHTML = '';
+        document.getElementById('tablePanel').style.display = 'none';
+        document.getElementById('dlBtn').style.display = 'none';
+        document.getElementById('signalBars').classList.remove('active');
+
+        btn.disabled = true;
+        btn.innerHTML = `
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="6" cy="6" r="4.5">
+                    <animateTransform attributeName="transform" type="rotate" from="0 6 6" to="360 6 6" dur="0.8s" repeatCount="indefinite"/>
+                </circle>
+            </svg>
+            Syncing…`;
+
+        setStatus('Active', true, false);
+        prog.classList.add('show');
+
+        addLog('Initializing Chrome driver...', 'info');
+        addLog('Navigate to Starlink login in the Chrome window.', 'warn');
+        addLog('Waiting for authentication — this may take 2–3 minutes.', '');
+
+        try {
+            const res = await fetch('/api/scrape', { method: 'POST' });
+            const result = await res.json();
+
+            prog.classList.remove('show');
+
+            if (result.success) {
+                if (result.data.length === 0) {
+                    addLog('Scrape completed but zero rows collected.', 'warn');
+                    addLog('Check terminal output for chart-level diagnostics.', 'warn');
+                    setStatus('No Data', false, false);
+                    document.getElementById('sessionDesc').innerHTML = 'Sync complete — no data captured.<br>Check terminal for details.';
+                } else {
+                    const total = result.total_usage;
+                    const count = result.data.length;
+
+                    const numVal = isNaN(parseFloat(total)) ? total.replace(' GB','') : parseFloat(total).toFixed(2);
+                    document.getElementById('liveTotal').innerHTML = `${numVal}<span class="unit">GB</span>`;
+                    document.getElementById('sessionDesc').innerHTML = `${count} daily records captured.<br>CSV export ready.`;
+                    document.getElementById('ticker').textContent =
+                        `Starlink WebScrape · Last Sync: ${new Date().toLocaleString()} · Port 4040`;
+                    document.getElementById('signalBars').classList.add('active');
+
+                    addLog(`Sync successful — ${count} records retrieved.`, 'ok');
+                    addLog(`Total reported usage: ${total}`, 'ok');
+
+                    const max = Math.max(...result.data.map(r => r.Usage_GB));
+                    const tbody = document.getElementById('tableBody');
+                    tbody.innerHTML = '';
+                    result.data.slice().reverse().forEach(row => {
+                        const pct = max > 0 ? (row.Usage_GB / max * 100).toFixed(1) : 0;
+                        tbody.innerHTML += `<tr>
+                            <td>${row.Date}</td>
+                            <td class="mono-val">${parseFloat(row.Usage_GB).toFixed(2)}</td>
+                            <td class="bar-wrap">
+                                <div class="bar-rail">
+                                    <div class="bar-fill" style="width:${pct}%"></div>
+                                </div>
+                            </td>
+                        </tr>`;
+                    });
+
+                    document.getElementById('rowBadge').textContent = count + ' entries';
+                    document.getElementById('tablePanel').style.display = 'block';
+                    document.getElementById('dlBtn').style.display = 'flex';
+                    setStatus('Synced', false, false);
+                }
+            } else {
+                addLog('ERROR: ' + result.error, 'err');
+                addLog('See terminal for full traceback.', 'warn');
+                setStatus('Error', false, true);
+                document.getElementById('sessionDesc').innerHTML = 'Sync failed.<br>Review system log for details.';
+            }
+        } catch(e) {
+            prog.classList.remove('show');
+            addLog('Cannot reach Flask server. Is app.py running on port 4040?', 'err');
+            setStatus('Offline', false, true);
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = `
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                <polygon points="2,1 11,6 2,11"/>
+            </svg>
+            Run New Sync`;
+    }
+</script>
+</body>
+</html>
